@@ -4,40 +4,73 @@
 from pyinaturalist import *
 import json
 
-# Look up places near Tucson with the most Gila Monster observations
-#response = get_places(q='Tucson', rank=['city', 'county'], per_page=5) # autocompleted. any good?
-#response = get_observation_species_counts(place_id=6793, taxon_id=20979)
+class Tool():
+    def __init__(self):
+        self.name = None
+        self.required_args = {}
+        self.optional_args = {}
+        self.outputs = {}
+        raise NotImplementedError
 
-#taxa = TaxonCount.from_json_list(response['results'][:10])
-#pprint(taxa)
+    def call(self, required_args, optional_args={}):
+        raise NotImplementedError
 
 
-#response = get_observation_identifiers(place_id=6793, taxon_id=20979)
-#taxa = TaxonCount.from_json_list(response['results'][:10])
-#pprint(taxa)
 
+class GetTaxonID(Tool):
+    def __init__(self):
+        self.name = "GetTaxonID"
+        self.required_args = {
+            "organism_str": 'string to search on, for example "bullfrog"'
+        }
+        self.optional_args = {
+            "rank": 'list of ranks to search in. Defaults to all ranks. Acceptable ranks are ["kingdom", "phylum", "subphylum", "superclass", "subclass", "superorder", "order", "suborder", "infraorder", "superfamily", "epifamily", "family", "subfamily", "supertribe", "tribe", "subtribe", "genus", "genushybrid", "species", "hybrid", "subspecies", "variety", "form"]',
+            "iconic_taxon_name": 'list of iconic taxononic groups to search in. Acceptble groups are ["Plantae", "Animalia", "Mollusca", "Reptilia", "Aves", "Amphibia", "Actinopterygii", "Mammalia", "Insecta", "Arachnida", "Fungi", "Protozoa", "Chromista", "unknow"]'
+        }
+        self.outputs = {
+            "results": "list of dictionaries that describe the taxa that match the search parameters. Includes name, common name, rank, ID numer, number of observations, and extinction status"
+        }
 
-"""
-       TOOLCALLs: [
-           {
-	       tool_name: "search_animalID",
-	       "tool_args": {"animal_str": "coachwhip", "tax_levels": None},
-	       "smart_output": {"animalID": int},
-	       "smart_output_description": "Find the animalID that best fits the species ID for a coachwhip snake, also known as a red racer, which lives in the american southwest."
-           },
-           {
-	       "tool_name": "search_locationID",
-	       "tool_args": {"location_str": "Sabino Canyon', 'USstate': 'AZ'},
-	       "smart_output": {"location(ID": int},
-	       "smart_output_description": "Find the location ID that best fits Sabino Canyon, just north of Tucson, AZ"
-           },
-	   {
-	       "tool_name": "get_sightings_data",
-	       "tool_args": {"animalID": agent_objs['animalID'], "locationID": agent_objs['locationID']}
-	       "smart_output": "coachwhip_sightings_in_sabino",
-	       "smart_output_description": None
-	   }
-"""
+    def call(self, required_args={}, optional_args={}):
+        missing_args = [arg for arg in self.required_args if arg not in required_args]
+        if missing_args:
+            raise Exception(tool.name + " is missing required args " + str(missing_args))
+
+        rank = optional_args['rank'] if 'rank' in optional_args else None
+        iconic_taxon_name = optional_args['iconic_taxon_name'] if 'iconic_taxon_name' in optional_args else None
+
+        results = get_taxa(q=required_args['animal_str'], rank=rank)['results']
+        results_abbreviated = abbreviate_organism_search_results(results, iconic_taxon_name=iconic_taxon_name)
+        return results_abbreviated
+
+    def abbreviate_organism_search_results(self, results, iconic_taxon_name):
+        abbreviated_fields = [
+            'id',
+            'rank',
+            #'rank_level',
+            #'iconic_taxon_id',
+            #'ancestor_ids',
+            #'is_active',
+            'name',
+            #'extinct',
+            'observations_count',
+            #'wikipedia_url',
+            'matched_term',
+            'iconic_taxon_name',
+            'preferred_common_name'
+        ]
+        abbreviated_results= []
+        for result in results:
+            if not result['is_active']:
+                continue
+            if (iconic_taxon_name is not None) and (result['iconic_taxon_name'] != iconic_taxon_name):
+                continue
+            if result['extinct']:
+                continue
+            abbreviated_result = {key: result[key] for key in abbreviated_fields if key in result}
+            abbreviated_results.append(abbreviated_result)
+        return abbreviated_results
+
 
 def call_tool(tool_name, agent_objs, output_name, smart_output_instruction=None):
     # smart_output_instruction=None means that the whole output is saved to agent_objs
@@ -45,8 +78,8 @@ def call_tool(tool_name, agent_objs, output_name, smart_output_instruction=None)
     pass
 
 def str_to_tool(tool_name):
-    if tool_name == "search_animalID":
-        return search_animalID
+    if tool_name == "search_organismID":
+        return search_organismID
     if tool_name == "search_locatioNID":
         return search_locatioNID
     if tool_name == "get_sightings":
@@ -66,7 +99,7 @@ def abbreviate_organism_search_results(results, iconic_taxon_name):
         #'ancestor_ids',
         #'is_active',
         'name',
-        'extinct',
+        #'extinct',
         'observations_count',
         #'wikipedia_url',
         'matched_term',
@@ -77,7 +110,9 @@ def abbreviate_organism_search_results(results, iconic_taxon_name):
     for result in results:
         if not result['is_active']:
             continue
-        if result['iconic_taxon_name'] != iconic_taxon_name:
+        if (iconic_taxon_name is not None) and (result['iconic_taxon_name'] != iconic_taxon_name):
+            continue
+        if result['extinct']:
             continue
         abbreviated_result = {key: result[key] for key in abbreviated_fields if key in result}
         results2.append(abbreviated_result)
@@ -104,10 +139,11 @@ def count_results(data):
     pass
 
 
-animal = 'koala'
-results = search_organismID(animal, rank=['species'], iconic_taxon_name="Mammalia")
-with open('results.json', 'w') as f:
-    json.dump(results, f, indent=4)
+#animal = 'bullfrog'
+#results = search_organismID(animal, rank=['species'], iconic_taxon_name="Mammalia")
+#results = search_organismID(animal, rank=['species'])
+#with open('results.json', 'w') as f:
+#    json.dump(results, f, indent=4)
 
 
 

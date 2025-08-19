@@ -28,8 +28,9 @@ class Tool():
 
 
 class GetTaxonID(Tool):
+    name = "GetTaxonID"
     declaration = {
-        "name": "GetTaxonID",
+        "name": name,
         "description": "Search on a keyword to find related taxon names and their ID numbers. Returns a list of dictionaries containing key information about the tasons returned by the search, including name, common name, rank, ID numer, and number of observations",
         "parameters": {
             "type": "object",
@@ -46,54 +47,47 @@ class GetTaxonID(Tool):
                 "rank": {
                     "type": "string",
                     "enum": ["kingdom", "phylum", "subphylum", "superclass", "subclass", "superorder", "order", "suborder", "infraorder", "superfamily", "epifamily", "family", "subfamily", "supertribe", "tribe", "subtribe", "genus", "genushybrid", "species", "hybrid", "subspecies", "variety", "form"],
-                    "description": "rank by which to filter results"
+                    "description": "rank by which to filter results, default to species"
                 }
             },
             "required": ["taxon_str"]
         }
     }
 
+    @classmethod
+    def call(cls, taxon_str, iconic_taxon_name=None, rank="species"):
+        results = get_taxa(q=taxon_str, rank=rank)['results']
+        results_abbreviated = cls.abbreviate_organism_search_results(results, iconic_taxon_name=iconic_taxon_name)
+        return results_abbreviated
 
-    #@classmethod
-    #def call(cls, required_args={}, optional_args={}):
-    #    missing_args = [arg for arg in cls.required_args if arg not in required_args]
-    #    if missing_args:
-    #        raise Exception(tool.name + " is missing required args " + str(missing_args))
-
-    #    rank = optional_args['rank'] if 'rank' in optional_args else None
-    #    iconic_taxon_name = optional_args['iconic_taxon_name'] if 'iconic_taxon_name' in optional_args else None
-
-    #    results = get_taxa(q=required_args['organism_str'], rank=rank)['results']
-    #    results_abbreviated = cls.abbreviate_organism_search_results(cls, results, iconic_taxon_name=iconic_taxon_name)
-    #    return results_abbreviated
-
-    #def abbreviate_organism_search_results(self, results, iconic_taxon_name):
-    #    abbreviated_fields = [
-    #        'id',
-    #        'rank',
-    #        #'rank_level',
-    #        #'iconic_taxon_id',
-    #        #'ancestor_ids',
-    #        #'is_active',
-    #        'name',
-    #        #'extinct',
-    #        'observations_count',
-    #        #'wikipedia_url',
-    #        'matched_term',
-    #        'iconic_taxon_name',
-    #        'preferred_common_name'
-    #    ]
-    #    abbreviated_results= []
-    #    for result in results:
-    #        if not result['is_active']:
-    #            continue
-    #        if (iconic_taxon_name is not None) and (result['iconic_taxon_name'] != iconic_taxon_name):
-    #            continue
-    #        if result['extinct']:
-    #            continue
-    #        abbreviated_result = {key: result[key] for key in abbreviated_fields if key in result}
-    #        abbreviated_results.append(abbreviated_result)
-    #    return abbreviated_results
+    @classmethod
+    def abbreviate_organism_search_results(cls, results, iconic_taxon_name):
+        abbreviated_fields = [
+            'id',
+            'rank',
+            #'rank_level',
+            #'iconic_taxon_id',
+            #'ancestor_ids',
+            #'is_active',
+            'name',
+            #'extinct',
+            'observations_count',
+            #'wikipedia_url',
+            'matched_term',
+            'iconic_taxon_name',
+            'preferred_common_name'
+        ]
+        abbreviated_results= []
+        for result in results:
+            if not result['is_active']:
+                continue
+            if (iconic_taxon_name is not None) and (result['iconic_taxon_name'] != iconic_taxon_name):
+                continue
+            if result['extinct']:
+                continue
+            abbreviated_result = {key: result[key] for key in abbreviated_fields if key in result}
+            abbreviated_results.append(abbreviated_result)
+        return abbreviated_results
 
 
 

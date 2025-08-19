@@ -1,11 +1,11 @@
 
 from google import genai
+from google.genai import types
 import json
 from nate_tools import GetTaxonID, GetLocationID
 from llm import LLM
 
 # This is the code for actually running the agent
-
 
 class Nate:
     def __init__(self, api_key, system_prompt_path, tools=None):
@@ -19,6 +19,8 @@ class Nate:
             self.tools = []
             self.tools.append(GetTaxonID.get_declaration())
             self.tools.append(GetLocationID.get_declaration())
+            self.tools_dict = {}
+            self.tools_dict[GetTaxonID.name] = GetTaxonID
         self.llm = LLM(self.api_key, tools=self.tools)
         
     def load_system_prompt(self, fname):
@@ -30,41 +32,33 @@ class Nate:
     def add_msg(self, role, content):
         msg = {'role': role, 'parts': [{'text': content}]}
         self.chat_hist.append(msg)
-        
+       
     def call(self):
-        response, function_call, usage = self.llm.call(self.chat_hist)
-        self.print_message("NATE", response)
-        self.add_msg('model', response)
-        self.call_tools(function_call)
+        content, usage = self.llm.call(self.chat_hist)
+        self.chat_hist.append(content) # Model's Tool Call
+        call_again = False
+        for part in content.parts:
+            if part.text is not None:
+                self.print_message("NATE", part.text)
+            elif part.function_call is not None:
+                call_again = True
+                self.print_message("TOOL", part.function_call.name)
+                tool_result = self.call_tool(part.function_call)
+
+                function_response_part = genai.types.Part.from_function_response(
+                    name=part.function_call.name,
+                    response={"result": tool_result},
+                )
+                self.chat_hist.append(types.Content(role="user", parts=[function_response_part])) # tool repsponse
+        if call_again:
+            self.call()
 
     def print_message(self, role, message):
         print("\n" + role + ":\n" + message + "\n")
         
-    def call_tools(self, function_call):
-        print('TOOLS CALLS')
-        print(function_call)
-        #toolcalls = self.extract_toolcalls(response)
-        #if toolcalls is None:
-        #    return
-        #for toolcall in toolcalls:
-        #    tool_response = str(self.call_tool(toolcall))
-        #    self.add_msg("tool", tool_response)
-        pass
-
-    def extract_toolcalls(self, response):
-        #marker = "TOOLCALLS:"
-        #index = response.find(marker)
-        #if index == -1:
-        #    return None  # Marker not found
-        #raw_json = response[index + len(marker):].strip()
-        #return json.loads(raw_json)
-        pass
-
-    def call_tool(self, toolcall):
-        #tool = str_to_tool(toolcall['tool_name'])
-        #tool_response = tool(required_tool_args=tool['required_tool_args'], optional_tool_args=tool['optional_tool_args'])
-        #return tool_response
-        pass
+    def call_tool(self, function_call):
+        tool_result = self.tools_dict[function_call.name].call(**function_call.args)
+        return tool_result
 
     def get_user_input(self):
         print("\nUSER:")
@@ -74,30 +68,9 @@ class Nate:
             print('quitting...')
             quit()
 
-
-def test_nate():
-    api_key = ""
-    with open("../API_KEY.txt", "r") as file:
-        api_key = file.read().strip()
-    fname = "prompt.txt"
-    nate = Nate(api_key, fname)
-
-    print("\nNATE:")
-    print("Hello, I'm an assistant for helping you find answers to your ecological questions. What would you like me to do?")
-    
-    user_input = "Do you have access to any functions? List any function names but don't call them"
-    nate.add_msg("user", user_input)
-    nate.print_message("user", user_input)
-    nate.call()
-
     
 def main():
    
-    # DEBUG
-    #test_nate()
-    #quit()
-    # END DEBUG
-
     api_key = ""
     with open("../API_KEY.txt", "r") as file:
         api_key = file.read().strip()
@@ -114,6 +87,5 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 

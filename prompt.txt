@@ -6,5 +6,4 @@ Notes:
  - If you can answer a quesiton without calling a tool, do so.
  - Avoid long-winded answers.
 
-Acknowledge that you understand before we begin.
 

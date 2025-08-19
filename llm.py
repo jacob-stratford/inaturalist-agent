@@ -30,14 +30,13 @@ class LLM:
             contents=contents,
             config=self.config
         )
-        text = response.text
-        function_call = response.candidates[0].content.parts[0].function_call
+        content = response.candidates[0].content
         usage = {
             "input_tokens": response.usage_metadata.prompt_token_count,
             "output_tokens": response.usage_metadata.candidates_token_count,
             "total_tokens": response.usage_metadata.total_token_count
         }
-        return text, function_call, usage
+        return content, usage
 
     def count_tokens(self, contents):
         # returns int
@@ -74,11 +73,11 @@ def test():
     llm = LLM(api_key, tools=tools)
     prompt = "Do you have any available functions? Don't test them or call them in any way - just tell me yes or no and the names of any functions available" 
     num_input_tokens = llm.count_tokens(prompt)
-    response, function_call, usage = llm.call(prompt)
+    texts, function_calls, usage = llm.call(prompt)
     print("\ninput str: " + prompt)
     print("\ninput tokens: " + str(num_input_tokens))
-    print("\nresponse: " + str(response))
-    print("\nfunction_call: " + str(function_call))
+    print("\nresponse: " + str(texts))
+    print("\nfunction_call: " + str(function_calls))
     print("\nusage: " + str(usage))
 
 

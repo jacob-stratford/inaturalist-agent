@@ -42,7 +42,7 @@ class Nate:
                 self.print_message("NATE", part.text)
             elif part.function_call is not None:
                 call_again = True
-                self.print_message("TOOL", part.function_call.name)
+                self.print_message("TOOL", part.function_call.name + str(part.function_call.args))
                 tool_result = self.call_tool(part.function_call)
 
                 function_response_part = genai.types.Part.from_function_response(

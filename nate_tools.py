@@ -93,6 +93,7 @@ class GetTaxonID(Tool):
 
 class GetLocationID(Tool):
 
+    name = "GetLocationID"
     declaration = {
         "name": "GetLocationID",
         "description": "Search on a keyword to find related location names and their ID numbers. Returns a list of dictionaries containing key information about the locations returned by the search, including id, name, display_name, place_type, admin_level, location (lat,lon), and ancestor_place_ids (list of id-name pairs for location ancestors)",
@@ -108,70 +109,40 @@ class GetLocationID(Tool):
         }
     }
 
+    @classmethod
+    def call(cls, location_str):
+        url = "https://api.inaturalist.org/v1/places/autocomplete?q="
+        url += location_str
+        url += "&order_by=area"
+        response = requests.get(url)
+        res = response.json()
+        
+        results_abbreviated = cls.abbreviate_location_search_result(res['results'])
+        return results_abbreviated
 
-    #@classmethod
-    #def call(cls, required_args={}, optional_args={}):
-
-    #    missing_args = [arg for arg in cls.required_args if arg not in required_args]
-    #    if missing_args:
-    #        raise Exception(tool.name + " is missing required args " + str(missing_args))
-
-    #    url = "https://api.inaturalist.org/v1/places/autocomplete?q="
-    #    url += required_args['location_str']
-    #    url += "&order_by=area"
-    #    response = requests.get(url)
-    #    res = response.json()
-
-    #    results_abbreviated = cls.abbreviate_location_search_result(res['results'])
-    #    return results_abbreviated
-
-
-    #@classmethod
-    #def abbreviate_location_search_result(cls, res):
-    #    if not res:
-    #        return {}
-    #    results = []
-    #    for res_ in res:
-    #        location = {}
-    #        location['id'] = res_['id']
-    #        location['name'] = res_['name']
-    #        location['display_name'] = res_['display_name']
-    #        location['place_type'] = res_['place_type']
-    #        location['admin_level'] = res_['admin_level']
-    #        location['location'] = res_['location']
-    #        location['ancestor_place_ids'] = cls.get_ancestor_names(res_['ancestor_place_ids'])
-    #        results.append(location)
-    #    return results
+    @classmethod
+    def abbreviate_location_search_result(cls, res):
+        if not res:
+            return {}
+        results = []
+        for res_ in res:
+            location = {}
+            location['id'] = res_['id']
+            location['name'] = res_['name']
+            location['display_name'] = res_['display_name']
+            location['place_type'] = res_['place_type']
+            location['admin_level'] = res_['admin_level']
+            location['location'] = res_['location']
+            location['ancestor_place_ids'] = cls.get_ancestor_names(res_['ancestor_place_ids'])
+            results.append(location)
+        return results
            
-    #@classmethod
-    #def get_ancestor_names(cls, ids):
-    #    if not ids:
-    #        return None
-    #    return ids
-    #    for id in ids:
-    #        pass 
-
-
-
-
-
-# Look up places near Tucson with the most Gila Monster observations
-#response = get_places(q='Tucson', rank=['city', 'county'], per_page=5) # autocompleted. any good?
-#response = get_observation_species_counts(place_id=6793, taxon_id=20979)
-
-#taxa = TaxonCount.from_json_list(response['results'][:10])
-#pprint(taxa)
-
-
-#response = get_observation_identifiers(place_id=6793, taxon_id=20979)
-#taxa = TaxonCount.from_json_list(response['results'][:10])
-#pprint(taxa)
-
-# Find locations with "Tucson" in the name:
-#response = GetLocationID.call(required_args={"location_str": "Tucson"})
-#print("response:")
-#for res in response:
-#    print(res['name'], res['ancestor_place_ids'])
-
-
+    @classmethod
+    def get_ancestor_names(cls, ids):
+        return None
+        #if not ids:
+        #    return None
+        #return ids
+        #for id in ids:
+        #    pass 
 

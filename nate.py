@@ -14,13 +14,13 @@ class Nate:
         system_prompt = self.load_system_prompt(system_prompt_path)
         self.add_msg('user', system_prompt)
         self.add_msg('model', 'I understand the instructions, and I will act accordingly')
-        self.tools = tools
-        if tools is None:
-            self.tools = []
-            self.tools.append(GetTaxonID.get_declaration())
-            self.tools.append(GetLocationID.get_declaration())
-            self.tools_dict = {}
-            self.tools_dict[GetTaxonID.name] = GetTaxonID
+        self.tools = [] if tools else None
+        self.tools_dict = {}
+        if tools is not None:
+            for tool in tools:
+                self.tools.append(tool.get_declaration())
+                self.tools_dict[tool.name] = tool
+
         self.llm = LLM(self.api_key, tools=self.tools)
         
     def load_system_prompt(self, fname):
@@ -75,7 +75,8 @@ def main():
     with open("../API_KEY.txt", "r") as file:
         api_key = file.read().strip()
     fname = "prompt.txt"
-    nate = Nate(api_key, fname)
+    tools = [GetTaxonID, GetLocationID]
+    nate = Nate(api_key, fname, tools=tools)
 
     print("\nNATE:")
     print("Hello, I'm an assistant for helping you find answers to your ecological questions. What would you like me to do?")

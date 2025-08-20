@@ -2,8 +2,7 @@
 # Tools that the inaturalist agent can call
 
 #from pyinaturalist import *
-from pyinaturalist import get_taxa
-import json
+from pyinaturalist import get_taxa, get_observation_species_counts, TaxonCount
 import requests
 
 class Tool():
@@ -145,4 +144,44 @@ class GetLocationID(Tool):
         #return ids
         #for id in ids:
         #    pass 
+
+
+class GetObservationData(Tool):
+
+    name = "GetObservationData"
+    declaration = {
+        "name": "GetObservationData",
+        "description": "Get observation counts for a taxonID,placeID pair. Under development - DO NOT CALL or you'll use all our input tokens",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "taxon_id": {
+                    "type": "integer",
+                    "description": 'taxon_id by which to filter observations'
+                },
+                "place_id": {
+                    "type": "integer",
+                    "description": 'place_id for the georaphic region that observations are pulled from'
+                }
+            },
+            "required": ["taxon_id", "place_id"]
+        }
+    }
+
+    @classmethod
+    def call(cls, taxon_id=None, place_id=None):
+        if taxon_id is None or place_id is None:
+            return "Need a taxon_id or a place_id"
+        response = get_observation_species_counts(place_id=place_id, taxon_id=taxon_id)
+        response = str(response)[:300]  # DO NOT REMOVE otherwise the output is HUGE and will use up all my tokens!
+        response = response[:250] + "\n\nPartial answer because this is still under development."
+        print(response)
+        return response
+
+##taxa = TaxonCount.from_json_list(response['results'][:10])
+#pprint(taxa)
+#with open("data.json", "w") as json_file:
+#    json.dump(response, json_file, indent=4)
+
+
 

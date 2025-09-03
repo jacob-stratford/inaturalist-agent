@@ -4,6 +4,10 @@
 #from pyinaturalist import *
 from pyinaturalist import get_taxa, get_observation_species_counts, TaxonCount
 import requests
+import pandas as pd
+import pdb
+
+from data_objects import DataFrame
 
 class Tool():
 
@@ -57,7 +61,7 @@ class GetTaxonID(Tool):
     def call(cls, taxon_str, iconic_taxon_name=None, rank="species"):
         results = get_taxa(q=taxon_str, rank=rank)['results']
         results_abbreviated = cls.abbreviate_organism_search_results(results, iconic_taxon_name=iconic_taxon_name)
-        return results_abbreviated
+        return results_abbreviated, None
 
     @classmethod
     def abbreviate_organism_search_results(cls, results, iconic_taxon_name):
@@ -101,7 +105,7 @@ class GetLocationID(Tool):
             "properties": {
                 "location_str": {
                     "type": "string",
-                    "description": 'string to search, for example "Tucson"'
+                    "description": 'string to search, for example "Tucson" or "Pima County"'
                 }
             },
             "required": ["location_str"]
@@ -117,7 +121,7 @@ class GetLocationID(Tool):
         res = response.json()
         
         results_abbreviated = cls.abbreviate_location_search_result(res['results'])
-        return results_abbreviated
+        return results_abbreviated, None
 
     @classmethod
     def abbreviate_location_search_result(cls, res):
@@ -151,7 +155,7 @@ class GetObservationData(Tool):
     name = "GetObservationData"
     declaration = {
         "name": "GetObservationData",
-        "description": "Get observation counts for a taxonID,placeID pair. Under development - DO NOT CALL or you'll use all our input tokens",
+        "description": "Get location, time, and other observation data based on a taxonID, placeID pair",
         "parameters": {
             "type": "object",
             "properties": {
@@ -162,26 +166,58 @@ class GetObservationData(Tool):
                 "place_id": {
                     "type": "integer",
                     "description": 'place_id for the georaphic region that observations are pulled from'
+                },
+                "dataframe_name": {
+                    "type": "string",
+                    "description": "Name of DataFrame that stores result"
                 }
+
             },
-            "required": ["taxon_id", "place_id"]
+            "required": ["taxon_id", "place_id", "dataframe_name"]
         }
     }
 
     @classmethod
-    def call(cls, taxon_id=None, place_id=None):
+    def call(cls, taxon_id=None, place_id=None, dataframe_name=False):
         if taxon_id is None or place_id is None:
             return "Need a taxon_id or a place_id"
-        response = get_observation_species_counts(place_id=place_id, taxon_id=taxon_id)
-        response = str(response)[:300]  # DO NOT REMOVE otherwise the output is HUGE and will use up all my tokens!
-        response = response[:250] + "\n\nPartial answer because this is still under development."
-        print(response)
-        return response
+        results = get_observation_species_counts(place_id=place_id, taxon_id=taxon_id)
+
+        if dataframe_name is None:
+            results = str(results)[:300]  # DO NOT REMOVE otherwise the output is HUGE and will use up all my tokens!
+            results = results[:250] + "\n\nPartial answer because this is still under development."
+            print(results)
+            return results
+       
+        results = results['results']
+        data_dict = {
+            'taxon_id': [res['taxon']['id'] for res in results],
+            'rank': [res['taxon']['rank'] for res in results],
+            'iconic_taxon_id': [res['taxon']['iconic_taxon_id'] for res in results],
+            'name': [res['taxon']['name'] for res in results],
+            'ancestry': [res['taxon']['ancestry'] for res in results],
+            'extinct': [res['taxon']['extinct'] for res in results],
+            'photo_url': [res['taxon']['default_photo']['url'] for res in results],
+            'photo_attribution': [res['taxon']['default_photo']['attribution'] for res in results],
+            'observations_count': [res['taxon']['observations_count'] for res in results],
+            'wikipedia_url': [res['taxon']['wikipedia_url'] for res in results],
+            'iconic_taxon_name': [res['taxon']['iconic_taxon_name'] for res in results],
+            'conservaton_status': [res['taxon']['conservation_status']['status_name'] if 'conservation_status' in res['taxon'] else None for res in results],
+            'preferred_common_name': [res['taxon']['preferred_common_name'] if 'preferred_common_name' in res['taxon'] else None for res in results]
+        }
+
+        df = pd.DataFrame(data_dict)
+        if df is None:
+            return "No DataFrame Produced", None
+        DF = DataFrame(dataframe_name, df)
+        return DF.get_summary(), DF
+
 
 ##taxa = TaxonCount.from_json_list(response['results'][:10])
 #pprint(taxa)
 #with open("data.json", "w") as json_file:
 #    json.dump(response, json_file, indent=4)
+
 
 
 

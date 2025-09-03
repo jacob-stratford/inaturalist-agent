@@ -20,6 +20,7 @@ class Nate:
             for tool in tools:
                 self.tools.append(tool.get_declaration())
                 self.tools_dict[tool.name] = tool
+        self.objs = {}
 
         self.llm = LLM(self.api_key, tools=self.tools)
         
@@ -57,7 +58,9 @@ class Nate:
         print("\n" + role + ":\n" + message + "\n")
         
     def call_tool(self, function_call):
-        tool_result = self.tools_dict[function_call.name].call(**function_call.args)
+        tool_result, obj = self.tools_dict[function_call.name].call(**function_call.args)
+        if obj is not None:
+            self.objs[obj.name] = obj.data
         return tool_result
 
     def get_user_input(self):

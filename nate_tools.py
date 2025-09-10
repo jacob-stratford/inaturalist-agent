@@ -7,6 +7,7 @@ import requests
 import pandas as pd
 import pdb
 import re
+from datetime import datetime
 
 from data_objects import DataFrame
 
@@ -212,6 +213,133 @@ class GetObservationData(Tool):
             return "No DataFrame Produced", None
         DF = DataFrame(dataframe_name, df)
         return DF.get_summary(), DF
+
+
+class GetObservations(Tool):
+
+    name = "GetObservations"
+    declaration = {
+        "name": "GetObservations",
+        "description": "Get location, time, and other observation data based on a taxonID, placeID pair and other params",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "taxon_id": {
+                    "type": "integer",
+                    "description": 'taxon_id by which to filter observations'
+                },
+                "place_id": {
+                    "type": "integer",
+                    "description": 'place_id for the georaphic region that observations are pulled from'
+                },
+                "dataframe_name": {
+                    "type": "string",
+                    "description": "Name of DataFrame that stores result"
+                },
+                "d1": {
+                    "type": "string",
+                    "description": "Earliest datetime for observations, formatted YYYY-MM-DD"
+                },
+                "d2": {
+                    "type": "string",
+                    "description": "Latest datetime cutoff for observations, formatted YYYY-MM-DD"
+                }
+                # Consider replacing d1, d2, etc. with an open "params" input object/string
+
+            },
+            "required": ["taxon_id", "place_id", "dataframe_name"]
+        }
+    }
+
+    @classmethod
+    def call(cls, objs, taxon_id=None, place_id=None, dataframe_name=False, d1=None, d2=None):
+
+        api_url = 'https://api.inaturalist.org/v1/observations'
+        per_page = 100  # Max per_page for the API
+
+        params = {}
+        params['taxon_id'] = taxon_id
+        params['place_id'] = place_id
+        params['per_page'] = per_page
+        if d1 is not None:
+            params['d1'] = d1
+        if d2 is not None:
+            params['d2'] = d2
+
+        all_results = []
+        page = 1
+    
+        while True:
+            print(f"Fetching page {page}...")
+            params['page'] = page
+            
+            response = requests.get(api_url, params=params)
+            if response.status_code != 200:
+                print(f"Error: Unable to fetch data. Status code: {response.status_code}")
+                return str(pd.DataFrame())[:500], None
+    
+            data = response.json()
+            observations = data.get("results", [])
+            
+            if not observations:
+                break
+            
+            all_results.extend(observations)
+            
+            if len(observations) < per_page:
+                break
+            
+            page += 1
+    
+        parsed_data = []
+        for obs in all_results:
+            # Safely extract nested data with a fallback
+            taxon = obs.get('taxon', {})
+            user = obs.get('user', {})
+            photos = obs.get('photos', [])
+            default_photo = photos[0] if photos else {}
+    
+            # Construct attribution string
+            attribution = ""
+            if 'id' in obs and user.get('login'):
+                attribution = f"Photo by {user['login']} via iNaturalist. View the observation: https://www.inaturalist.org/observations/{obs['id']}"
+    
+            parsed_data.append({
+                'observation_id': obs.get('id'),
+                'verifiable': obs.get('verifiable'),
+                'quality_grade': obs.get('quality_grade'),
+                'observed_on': obs.get('observed_on'),
+                'created_at': obs.get('created_at'),
+                'latitude': obs.get('latitude'),
+                'longitude': obs.get('longitude'),
+                'scientific_name': taxon.get('name'),
+                'common_name': taxon.get('preferred_common_name'),
+                'taxon_id': taxon.get('id'),
+                'user_id': user.get('id'),
+                'user_login': user.get('login'),
+                'place_ids': obs.get('place_ids'),
+                'wikipedia_url': taxon.get('wikipedia_url'),
+                'default_photo_url': default_photo.get('url'),
+                'default_photo_attribution': default_photo.get('attribution'),
+                'all_photo_urls': [photo.get('url') for photo in photos],
+                'attribution': attribution
+            })
+    
+        df = pd.DataFrame(parsed_data)
+        
+        # Convert dates to datetime objects for better handling
+        df['observed_on'] = pd.to_datetime(df['observed_on'], errors='coerce')
+        df['created_at'] = pd.to_datetime(df['created_at'], errors='coerce')
+        
+        return str(df)[:500], None
+
+
+# TODO:
+# - update the output format to include a text summary, plus a Nate dataframe with the correct name
+# - Consider updating to allow other parameters as inputs
+# - reduce the space used for attributions, and generate on the fly as necessary
+# - Test thouroughly
+# - Add a separate tool for making histograms
 
 
 class ReadDF(Tool):

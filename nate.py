@@ -1,7 +1,7 @@
 
 from google.genai import types
 import json
-from nate_tools import GetTaxonID, GetLocationID, GetObservationData, ReadDF
+from nate_tools import GetTaxonID, GetLocationID, GetObservationData, GetObservations, ReadDF
 from llm import LLM
 import argparse
 
@@ -95,7 +95,7 @@ def main(args):
     with open("../API_KEY.txt", "r") as file:
         api_key = file.read().strip()
     fname = "prompt.txt"
-    tools = [GetTaxonID, GetLocationID, GetObservationData, ReadDF]
+    tools = [GetTaxonID, GetLocationID, GetObservationData, GetObservations, ReadDF]
     objs = None
 
     if args.test:

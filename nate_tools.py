@@ -6,6 +6,7 @@ from pyinaturalist import get_taxa, get_observation_species_counts, TaxonCount
 import requests
 import pandas as pd
 import pdb
+import re
 
 from data_objects import DataFrame
 
@@ -22,7 +23,7 @@ class Tool():
     }
 
     @classmethod
-    def call(self, required_args, optional_args={}):
+    def call(self, objs):
         raise NotImplementedError
 
     @classmethod
@@ -58,7 +59,7 @@ class GetTaxonID(Tool):
     }
 
     @classmethod
-    def call(cls, taxon_str, iconic_taxon_name=None, rank="species"):
+    def call(cls, objs, taxon_str, iconic_taxon_name=None, rank="species"):
         results = get_taxa(q=taxon_str, rank=rank)['results']
         results_abbreviated = cls.abbreviate_organism_search_results(results, iconic_taxon_name=iconic_taxon_name)
         return results_abbreviated, None
@@ -113,7 +114,7 @@ class GetLocationID(Tool):
     }
 
     @classmethod
-    def call(cls, location_str):
+    def call(cls, objs, location_str):
         url = "https://api.inaturalist.org/v1/places/autocomplete?q="
         url += location_str
         url += "&order_by=area"
@@ -178,16 +179,16 @@ class GetObservationData(Tool):
     }
 
     @classmethod
-    def call(cls, taxon_id=None, place_id=None, dataframe_name=False):
+    def call(cls, objs, taxon_id=None, place_id=None, dataframe_name=False):
         if taxon_id is None or place_id is None:
-            return "Need a taxon_id or a place_id"
+            return "Need a taxon_id or a place_id", None
         results = get_observation_species_counts(place_id=place_id, taxon_id=taxon_id)
 
         if dataframe_name is None:
             results = str(results)[:300]  # DO NOT REMOVE otherwise the output is HUGE and will use up all my tokens!
             results = results[:250] + "\n\nPartial answer because this is still under development."
             print(results)
-            return results
+            return results, None
        
         results = results['results']
         data_dict = {
@@ -211,6 +212,124 @@ class GetObservationData(Tool):
             return "No DataFrame Produced", None
         DF = DataFrame(dataframe_name, df)
         return DF.get_summary(), DF
+
+
+class ReadDF(Tool):
+
+    name = "ReadDF"
+    declaration = {
+    "name": "ReadDF",
+    "description": "Read a DataFrame object, specifying columns, number of rows, and filters.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "df": {
+                "type": "string",
+                "description": 'DataFrame object name'
+            },
+            "cols": {
+                "type": "array",
+                "description": 'List of column names to include in the result. Defaults to all.',
+                "items": {
+                    "type": "string"
+                }
+            },
+            "n": {
+                "type": "integer",
+                "description": "Max number of rows to read. Default 5, max 20."
+            },
+            "query_tuples": {
+                "type": "array",
+                "description": "List of len=3 tuples for querying the dataframe, where each tuple has the format (column, op, val). The following operations are allowed: {\"=\", \">\", \"<\", \">=\", \"<=\", \"!=\"}. The value 'val' will be a string and is casted to the correct type by the function.",
+                "items": {
+                    "type": "array",
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "required": ["df"]
+    }
+    }
+
+    @classmethod
+    def call(cls, objs, df=None, cols=None, n=5, query_tuples=None):
+        if df is None:
+            raise ValueError("Need a dataframe name")
+
+        if df not in objs:
+            raise ValueError(f"DataFrame '{df}' not found")
+
+        if type(cols) != list and cols is not None:
+            raise ValueError("cols must be a list")
+
+        if n < 1:
+            raise ValueError("n must be greater than 0")
+
+        if n > 20:
+            raise ValueError("n must be less than or equal to 20")
+
+        ALLOWED_OPS = {"=", "==", ">", "<", ">=", "<=", "!="}
+        SAFE_COL_RE = re.compile(r'^[A-Za-z0-9_ ]+$')
+
+        def safe_filter(df_obj, column, op, value):
+            if op not in ALLOWED_OPS:
+                raise ValueError("Operation not allowed")
+            elif op == "=":
+                op = "=="
+            if column not in df_obj.columns:
+                raise ValueError("Column not found")
+            if not SAFE_COL_RE.match(column):
+                raise ValueError(f"Unsafe column name: {column}")
+
+            # Determine the target data type from the DataFrame's dtypes
+            target_dtype = df_obj.dtypes[column]
+            casted_value = None
+        
+            try:
+                # Check if the column is a datetime type
+                if pd.api.types.is_datetime64_any_dtype(target_dtype):
+                    casted_value = pd.to_datetime(value)
+                # Check if the column is a numeric type (int, float)
+                elif pd.api.types.is_numeric_dtype(target_dtype):
+                    casted_value = pd.to_numeric(value)
+                # Check for boolean types
+                elif pd.api.types.is_bool_dtype(target_dtype):
+                    if value.lower() in ['true', '1', 't', 'y', 'yes']:
+                        casted_value = True
+                    elif value.lower() in ['false', '0', 'f', 'n', 'no']:
+                        casted_value = False
+                    else:
+                        raise ValueError(f"Cannot convert '{value}' to boolean.")
+                # If none of the above, assume it's a string and use the original value
+                else:
+                    casted_value = value
+
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"Could not cast value '{value}' to type '{target_dtype}': {e}")
+
+            return f"`{column}` {op} @casted_value", casted_value
+
+
+        df_filt = objs[df].data.copy()
+        cols_filt = df_filt.columns if cols is None else cols
+
+        missing = set(cols_filt) - set(df_filt.columns)
+        if missing:
+            raise ValueError(f"Columns not found: {missing}")
+
+        if query_tuples is not None:
+            if type(query_tuples) != list:
+                raise ValueError("query_tuples must be a list")
+            for qt in query_tuples:
+                expr, casted_value = safe_filter(df_filt, qt[0], qt[1], qt[2])
+                df_filt = df_filt.query(expr, local_dict={"casted_value": casted_value})
+
+        return str(df_filt[cols_filt].head(n)), None
+
 
 
 ##taxa = TaxonCount.from_json_list(response['results'][:10])

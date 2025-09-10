@@ -1,9 +1,7 @@
 
-from google import genai
-from google.genai import types
+from google.genai import Client
 from google.genai.types import Tool, GenerateContentConfig
 import nate_tools
-#from tools import Tool2
 import json
 
 # TODO: 
@@ -14,13 +12,13 @@ class LLM:
         # api key to use the model
         # llm model, 
         # list of tool descriptions in gemini format
-        self.client = genai.Client(
+        self.client = Client(
             api_key=api_key,
         )
         self.model = model if model is not None else "gemini-2.0-flash"
         self.tools = tools if tools else [nate_tools.Tool.declaration]
-        self.llm_tools = types.Tool(function_declarations=self.tools)
-        self.config = types.GenerateContentConfig(
+        self.llm_tools = Tool(function_declarations=self.tools)
+        self.config = GenerateContentConfig(
             tools=[self.llm_tools], 
         )
 

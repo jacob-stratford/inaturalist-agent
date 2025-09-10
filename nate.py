@@ -1,17 +1,35 @@
 
-from google import genai
 from google.genai import types
 import json
-from nate_tools import GetTaxonID, GetLocationID, GetObservationData
+from nate_tools import GetTaxonID, GetLocationID, GetObservationData, ReadDF
 from llm import LLM
+import argparse
 
 # This is the code for actually running the agent
 
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="A simple script demonstrating store_true.")
+    #parser.add_argument('', type=str, help='a string')
+    parser.add_argument('--test', action='store_true', help='Load test datasets at init')
+    return parser.parse_args()
+
+
 class Nate:
-    def __init__(self, api_key, system_prompt_path, tools=None):
+    def __init__(self, api_key, system_prompt_path, tools=None, objs=None):
         self.api_key = api_key
         self.chat_hist = []
+        self.objs = {}
         system_prompt = self.load_system_prompt(system_prompt_path)
+        assert objs is None or type(objs) == dict, "objs must be None or dict"
+        if objs is not None:
+            system_prompt += "\n\nYou have access to the following data objects:\n"
+            for obj_name in objs:
+                system_prompt += objs[obj_name].get_summary() + "\n"
+                self.objs[obj_name] = objs[obj_name]
+        else:
+            self.objs = {}
+
         self.add_msg('user', system_prompt)
         self.add_msg('model', 'I understand the instructions, and I will act accordingly')
         self.tools = [] if tools else None
@@ -20,7 +38,6 @@ class Nate:
             for tool in tools:
                 self.tools.append(tool.get_declaration())
                 self.tools_dict[tool.name] = tool
-        self.objs = {}
 
         self.llm = LLM(self.api_key, tools=self.tools)
         
@@ -46,7 +63,7 @@ class Nate:
                 self.print_message("TOOL", part.function_call.name + str(part.function_call.args))
                 tool_result = self.call_tool(part.function_call)
 
-                function_response_part = genai.types.Part.from_function_response(
+                function_response_part = types.Part.from_function_response(
                     name=part.function_call.name,
                     response={"result": tool_result},
                 )
@@ -58,7 +75,7 @@ class Nate:
         print("\n" + role + ":\n" + message + "\n")
         
     def call_tool(self, function_call):
-        tool_result, obj = self.tools_dict[function_call.name].call(**function_call.args)
+        tool_result, obj = self.tools_dict[function_call.name].call(self.objs, **function_call.args)
         if obj is not None:
             self.objs[obj.name] = obj.data
         return tool_result
@@ -72,14 +89,23 @@ class Nate:
             quit()
 
     
-def main():
-   
+def main(args):
+
     api_key = ""
     with open("../API_KEY.txt", "r") as file:
         api_key = file.read().strip()
     fname = "prompt.txt"
-    tools = [GetTaxonID, GetLocationID, GetObservationData]
-    nate = Nate(api_key, fname, tools=tools)
+    tools = [GetTaxonID, GetLocationID, GetObservationData, ReadDF]
+    objs = None
+
+    if args.test:
+        import pandas as pd
+        from data_objects import DataFrame
+        df_fname = "test.csv"
+        obj_raw = pd.read_csv(df_fname)
+        obj = DataFrame("test_df", obj_raw)
+        objs={obj.name: obj}
+    nate = Nate(api_key, fname, tools=tools, objs=objs)
 
     print("\nNATE:")
     print("Hello, I'm an assistant for helping you find answers to your ecological questions. What would you like me to do?")
@@ -90,6 +116,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(parse_args())
 
 

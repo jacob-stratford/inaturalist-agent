@@ -9,8 +9,8 @@ class DataObject:
 
 class DataFrame(DataObject):
     def __init__(self, name, data):
-        assert type(name) == str
-        assert isinstance(data, pd.DataFrame)
+        assert type(name) == str, "DataFrame name must be a string"
+        assert isinstance(data, pd.DataFrame), "DataFrame data must be a pandas DataFrame"
         super().__init__(name, data)
 
     def get_summary(self):
@@ -19,5 +19,8 @@ class DataFrame(DataObject):
                 "and the following columns: " +
                 str([col for col in self.data.columns])) 
         return output
+
+
+
 
 

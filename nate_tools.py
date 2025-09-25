@@ -152,12 +152,12 @@ class GetLocationID(Tool):
         #    pass 
 
 
-class GetObservationData(Tool):
+class GetObservationSummary(Tool):
 
-    name = "GetObservationData"
+    name = "GetObservationSummary"
     declaration = {
-        "name": "GetObservationData",
-        "description": "Get location, time, and other observation data based on a taxonID, placeID pair",
+        "name": "GetObservationSummary",
+        "description": "Get name, common name, rank, extinction status, observation count, and wikipedia link for all observations that are descended from taxonID and are within a placeID (one row per species)",
         "parameters": {
             "type": "object",
             "properties": {

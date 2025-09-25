@@ -5,7 +5,7 @@ from llm import LLM
 import argparse
 import os
 
-from nate_tools import GetTaxonID, GetLocationID, GetObservationData, GetObservations, ReadDF
+from nate_tools import GetTaxonID, GetLocationID, GetObservationSummary, GetObservations, ReadDF
 
 # This is the code for actually running the agent
 
@@ -79,7 +79,7 @@ class Nate:
     def call_tool(self, function_call):
         tool_result, obj = self.tools_dict[function_call.name].call(self.objs, **function_call.args)
         if obj is not None:
-            self.objs[obj.name] = obj.data
+            self.objs[obj.name] = obj
         return tool_result
 
     def get_user_input(self):
@@ -95,7 +95,7 @@ def main(args):
 
     api_key = os.getenv("API_KEY")
     fname = "prompt.txt"
-    tools = [GetTaxonID, GetLocationID, GetObservationData, GetObservations, ReadDF]
+    tools = [GetTaxonID, GetLocationID, GetObservationSummary, GetObservations, ReadDF]
     objs = None
 
     if args.test:

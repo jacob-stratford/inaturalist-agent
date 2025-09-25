@@ -3,6 +3,7 @@ from google.genai import Client
 from google.genai.types import Tool, GenerateContentConfig
 import nate_tools
 import json
+import os
 
 # TODO: 
 # - gracefully work when no tools are provided
@@ -64,18 +65,23 @@ def test():
             "required": ["brightness", "color_temp"],
         },
     }
-    with open("../API_KEY.txt", "r") as file:
-        api_key = file.read().strip()
-    #tools = [set_light_values_declaration]
-    tools = []
+
+    api_key = os.getenv("API_KEY")
+
+    tools = [set_light_values_declaration]
+    #tools = []
     llm = LLM(api_key, tools=tools)
     prompt = "Do you have any available functions? Don't test them or call them in any way - just tell me yes or no and the names of any functions available" 
     num_input_tokens = llm.count_tokens(prompt)
-    texts, function_calls, usage = llm.call(prompt)
+    content, usage = llm.call(prompt)
+
     print("\ninput str: " + prompt)
     print("\ninput tokens: " + str(num_input_tokens))
-    print("\nresponse: " + str(texts))
-    print("\nfunction_call: " + str(function_calls))
+    for part in content.parts:
+        if part.text is not None:
+            print("\nresponse text: ", part.text)
+        elif part.function_call is not None:
+            print("function_call: ", part.function_call.name + str(part.function_call.args))
     print("\nusage: " + str(usage))
 
 

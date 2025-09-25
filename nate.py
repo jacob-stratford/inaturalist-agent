@@ -1,9 +1,11 @@
 
 from google.genai import types
 import json
-from nate_tools import GetTaxonID, GetLocationID, GetObservationData, GetObservations, ReadDF
 from llm import LLM
 import argparse
+import os
+
+from nate_tools import GetTaxonID, GetLocationID, GetObservationData, GetObservations, ReadDF
 
 # This is the code for actually running the agent
 
@@ -91,9 +93,7 @@ class Nate:
     
 def main(args):
 
-    api_key = ""
-    with open("../API_KEY.txt", "r") as file:
-        api_key = file.read().strip()
+    api_key = os.getenv("API_KEY")
     fname = "prompt.txt"
     tools = [GetTaxonID, GetLocationID, GetObservationData, GetObservations, ReadDF]
     objs = None

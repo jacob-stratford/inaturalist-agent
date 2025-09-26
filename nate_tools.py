@@ -377,6 +377,16 @@ class ReadDF(Tool):
                         "type": "string"
                     }
                 }
+            },
+            "sort_by": { 
+                "type": "array",
+                "description": 'List of (column name, asc/desc) tuples to sort by. Specify ascending or descending for each, as in [("column_name", "desc")].',
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
             }
         },
         "required": ["df"]
@@ -384,7 +394,7 @@ class ReadDF(Tool):
     }
 
     @classmethod
-    def call(cls, objs, df=None, cols=None, n=5, query_tuples=None):
+    def call(cls, objs, df=None, cols=None, n=5, query_tuples=None, sort_by=None):
         if df is None:
             raise ValueError("Need a dataframe name")
 
@@ -455,6 +465,38 @@ class ReadDF(Tool):
             for qt in query_tuples:
                 expr, casted_value = safe_filter(df_filt, qt[0], qt[1], qt[2])
                 df_filt = df_filt.query(expr, local_dict={"casted_value": casted_value})
+
+        # --- Sorting Logic ---
+        if sort_by is not None:
+            if not isinstance(sort_by, list):
+                raise ValueError("sort_by must be a list of columns or (column, 'desc') tuples.")
+
+            sort_cols = []
+            sort_ascending = []
+
+            for item in sort_by:
+                col_name = None
+                ascending = True
+
+                if isinstance(item, str):
+                    col_name = item
+                elif isinstance(item, list) and len(item) == 2 and item[1].lower() in ('asc', 'desc'):
+                    col_name = item[0]
+                    if item[1].lower() == 'desc':
+                        ascending = False
+                else:
+                    raise ValueError(f"Invalid sort item: {item}. Must be 'column_name' or ['column_name', 'desc'/'asc'].")
+
+                if col_name not in df_filt.columns:
+                    raise ValueError(f"Sort column '{col_name}' not found in DataFrame.")
+
+                sort_cols.append(col_name)
+                sort_ascending.append(ascending)
+
+            # Apply sorting
+            df_filt = df_filt.sort_values(by=sort_cols, ascending=sort_ascending)
+
+        # --- End Sorting Logic ---
 
         return str(df_filt[cols_filt].head(n)), None
 

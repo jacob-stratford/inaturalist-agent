@@ -8,6 +8,7 @@ import pandas as pd
 import pdb
 import re
 from datetime import datetime
+import math
 
 from data_objects import DataFrame
 
@@ -220,7 +221,7 @@ class GetObservations(Tool):
     name = "GetObservations"
     declaration = {
         "name": "GetObservations",
-        "description": "Get location, time, and other observation data based on a taxonID, placeID pair and other params",
+        "description": "Get a dataframe of many individual observations including location, time, and other observation data based on a taxonID, placeID pair and other params",
         "parameters": {
             "type": "object",
             "properties": {
@@ -243,6 +244,10 @@ class GetObservations(Tool):
                 "d2": {
                     "type": "string",
                     "description": "Latest datetime cutoff for observations, formatted YYYY-MM-DD"
+                },
+                "n": {
+                    "type": "integer",
+                    "description": "Max number of observations to return, default is unlimited"
                 }
                 # Consider replacing d1, d2, etc. with an open "params" input object/string
 
@@ -252,10 +257,14 @@ class GetObservations(Tool):
     }
 
     @classmethod
-    def call(cls, objs, taxon_id=None, place_id=None, dataframe_name=False, d1=None, d2=None):
+    def call(cls, objs, taxon_id=None, place_id=None, dataframe_name=False, d1=None, d2=None, n=None):
 
         api_url = 'https://api.inaturalist.org/v1/observations'
         per_page = 100  # Max per_page for the API
+        num_pages = None
+        if n is not None:
+            per_page = min(per_page, n)
+            num_pages = math.ceil(n/per_page)
 
         params = {}
         params['taxon_id'] = taxon_id
@@ -268,8 +277,8 @@ class GetObservations(Tool):
 
         all_results = []
         page = 1
-    
-        while True:
+   
+        while page <= num_pages:
             print(f"Fetching page {page}...")
             params['page'] = page
             
@@ -330,8 +339,14 @@ class GetObservations(Tool):
         # Convert dates to datetime objects for better handling
         df['observed_on'] = pd.to_datetime(df['observed_on'], errors='coerce')
         df['created_at'] = pd.to_datetime(df['created_at'], errors='coerce')
-        
-        return str(df)[:500], None
+
+       
+        # Make and return the Nate DataFrame 
+        if df is None:
+            return "No DataFrame Produced", None
+        DF = DataFrame(dataframe_name, df)
+        return DF.get_summary(), DF
+        #return str(df)[:500], None
 
 
 # TODO:

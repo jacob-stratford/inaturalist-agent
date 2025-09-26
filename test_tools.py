@@ -2,11 +2,10 @@
 
 
 import pandas as pd
-from nate_tools import GetTaxonID, GetLocationID, GetObservationData, ReadDF
+from nate_tools import GetTaxonID, GetLocationID, GetObservationSummary, GetObservations, ReadDF
 from data_objects import DataFrame
 
-
-
+"""
 # Testing ReadDF
 df_fname = "df_out_horny_toads.csv"
 obj_raw = pd.read_csv(df_fname)
@@ -19,6 +18,23 @@ res, objs = ReadDF.call(objs, df=df_name, cols=cols, query_tuples=filters)
 
 print(res)
 print(objs)
+"""
+
+# Testing GetObservations
+args = {
+    "taxon_id": 40,
+    "place_id": 35003,
+    "dataframe_name": "gila_monster_obs",
+    #"d1": "2024-01-01",
+    #"d2": "2025-01-01",
+    "n": 10
+}
+objs={}
+res, objs = GetObservations.call(objs, **args)
+
+print(res)
+print(type(objs))
+
 
 
 

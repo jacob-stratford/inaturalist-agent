@@ -21,4 +21,15 @@ Finally, run Nate with the command
 `python nate.py`
 
 
+## Prompt Examples
+
+`Get observations for the sonoran horned lizard (200591) in Arizona (40) in 2024.`
+
+`How many observations are there for each type of rattlesnake that has been observed in arizona? Arizona area code is 40. Plot the number of observations for each non-pigmy species, labeling with the species' common name`
+
+
+
+
+
+
 

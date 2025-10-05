@@ -590,6 +590,80 @@ class PlotHistogram(Tool):
             return f"Error creating histogram: {str(e)}", None
 
 
+class PlotXY(Tool):
+
+    name = "PlotXY"
+    declaration = {
+        "name": name,
+        "description": "Plot X-Y data from a DataFrame using plotly, with options for scatter plot, bar plot, or line graph. Y must be numeric, X can be numeric or strings. Displays the plot in the browser.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "df": {
+                    "type": "string",
+                    "description": "DataFrame object name"
+                },
+                "x_column": {
+                    "type": "string",
+                    "description": "Column name for X-axis data"
+                },
+                "y_column": {
+                    "type": "string",
+                    "description": "Column name for Y-axis data (must be numeric)"
+                },
+                "plot_type": {
+                    "type": "string",
+                    "enum": ["scatter", "bar", "line"],
+                    "description": "Type of plot: scatter, bar, or line. For line, X is assumed to be ordered."
+                }
+            },
+            "required": ["df", "x_column", "y_column", "plot_type"]
+        }
+    }
+
+    @classmethod
+    def call(cls, objs, df=None, x_column=None, y_column=None, plot_type=None):
+        if df is None:
+            return "Error: df parameter is required", None
+        if x_column is None:
+            return "Error: x_column parameter is required", None
+        if y_column is None:
+            return "Error: y_column parameter is required", None
+        if plot_type is None:
+            return "Error: plot_type parameter is required", None
+
+        if plot_type not in ["scatter", "bar", "line"]:
+            return "Error: plot_type must be one of 'scatter', 'bar', 'line'", None
+
+        if df not in objs:
+            return f"Error: DataFrame '{df}' not found", None
+
+        pandas_df = objs[df].data
+        if x_column not in pandas_df.columns:
+            return f"Error: X column '{x_column}' not found in DataFrame '{df}'", None
+        if y_column not in pandas_df.columns:
+            return f"Error: Y column '{y_column}' not found in DataFrame '{df}'", None
+
+        if not pd.api.types.is_numeric_dtype(pandas_df[y_column]):
+            return f"Error: Y column '{y_column}' must be numeric", None
+
+        try:
+            plot_df = pandas_df[[x_column, y_column]].copy()
+            if plot_type == "line" and pd.api.types.is_numeric_dtype(plot_df[x_column]):
+                plot_df = plot_df.sort_values(by=x_column)
+
+            if plot_type == "scatter":
+                fig = px.scatter(plot_df, x=x_column, y=y_column)
+            elif plot_type == "bar":
+                fig = px.bar(plot_df, x=x_column, y=y_column)
+            elif plot_type == "line":
+                fig = px.line(plot_df, x=x_column, y=y_column)
+            fig.show()
+            return f"{plot_type.capitalize()} plot of Y='{y_column}' vs X='{x_column}' from DataFrame '{df}' has been plotted and opened in the browser.", None
+        except Exception as e:
+            return f"Error creating plot: {str(e)}", None
+
+
 ##taxa = TaxonCount.from_json_list(response['results'][:10])
 #pprint(taxa)
 #with open("data.json", "w") as json_file:

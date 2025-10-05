@@ -259,17 +259,16 @@ class GetObservations(Tool):
     @classmethod
     def call(cls, objs, taxon_id=None, place_id=None, dataframe_name=False, d1=None, d2=None, n=None):
 
-        api_url = 'https://api.inaturalist.org/v1/observations'
-        per_page = 100  # Max per_page for the API
-        num_pages = None
-        if n is not None:
-            per_page = min(per_page, n)
-            num_pages = math.ceil(n/per_page)
+        # Parameter validation
+        if taxon_id is None or place_id is None:
+            return "Error: taxon_id and place_id are required", None
 
-        params = {}
-        params['taxon_id'] = taxon_id
-        params['place_id'] = place_id
-        params['per_page'] = per_page
+        api_url = 'https://api.inaturalist.org/v1/observations'
+        params = {
+            'taxon_id': taxon_id,
+            'place_id': place_id,
+            'per_page': 100  # Will be adjusted per page as needed
+        }
         if d1 is not None:
             params['d1'] = d1
         if d2 is not None:
@@ -277,27 +276,42 @@ class GetObservations(Tool):
 
         all_results = []
         page = 1
-   
-        while page <= num_pages:
+
+        while True:
+            # Adjust per_page for final page when n is specified
+            remaining = n - len(all_results) if n else params['per_page']
+            params['per_page'] = min(100, max(1, remaining)) if remaining > 0 else params['per_page']
+
             print(f"Fetching page {page}...")
             params['page'] = page
-            
-            response = requests.get(api_url, params=params)
-            if response.status_code != 200:
-                print(f"Error: Unable to fetch data. Status code: {response.status_code}")
-                return str(pd.DataFrame())[:500], None
-    
-            data = response.json()
+
+            try:
+                response = requests.get(api_url, params=params, timeout=30)
+                if response.status_code != 200:
+                    return f"Error: API request failed with status {response.status_code}", None
+
+                data = response.json()
+            except requests.exceptions.RequestException as e:
+                return f"Error: Request failed - {str(e)}", None
+            except ValueError as e:
+                return f"Error: Failed to parse JSON response - {str(e)}", None
+
             observations = data.get("results", [])
-            
+
             if not observations:
                 break
-            
+
             all_results.extend(observations)
-            
-            if len(observations) < per_page:
+
+            # Check if we've reached the limit
+            if n and len(all_results) >= n:
+                all_results = all_results[:n]
                 break
-            
+
+            # Check if this was the last page (fewer results than requested per_page)
+            if len(observations) < params['per_page']:
+                break
+
             page += 1
     
         parsed_data = []
@@ -521,7 +535,3 @@ class ReadDF(Tool):
 #pprint(taxa)
 #with open("data.json", "w") as json_file:
 #    json.dump(response, json_file, indent=4)
-
-
-
-

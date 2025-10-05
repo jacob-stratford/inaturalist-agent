@@ -5,7 +5,7 @@ from llm import LLM
 import argparse
 import os
 
-from nate_tools import GetTaxonID, GetLocationID, GetObservationSummary, GetObservations, ReadDF
+from nate_tools import GetTaxonID, GetLocationID, GetObservationSummary, GetObservations, ReadDF, PlotHistogram
 
 # This is the code for actually running the agent
 
@@ -95,7 +95,7 @@ def main(args):
 
     api_key = os.getenv("API_KEY")
     fname = "prompt.txt"
-    tools = [GetTaxonID, GetLocationID, GetObservationSummary, GetObservations, ReadDF]
+    tools = [GetTaxonID, GetLocationID, GetObservationSummary, GetObservations, ReadDF, PlotHistogram]
     objs = None
 
     if args.test:

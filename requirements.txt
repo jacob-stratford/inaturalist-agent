@@ -1,3 +1,4 @@
 google-genai>=1.38.0
 pyinaturalist>=0.20.2
 pandas>=2.3.2
+plotly>=5.0.0

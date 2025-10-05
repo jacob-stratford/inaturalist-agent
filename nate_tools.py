@@ -9,6 +9,8 @@ import pdb
 import re
 from datetime import datetime
 import math
+import plotly.express as px
+import plotly.graph_objects as go
 
 from data_objects import DataFrame
 
@@ -529,6 +531,63 @@ class ReadDF(Tool):
 
         return str(df_filt[cols_filt].head(n)), None
 
+
+class PlotHistogram(Tool):
+
+    name = "PlotHistogram"
+    declaration = {
+        "name": name,
+        "description": "Plot a histogram of a numeric column from a DataFrame using plotly and display it in the browser.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "df": {
+                    "type": "string",
+                    "description": 'DataFrame object name'
+                },
+                "column": {
+                    "type": "string",
+                    "description": 'Column name to plot the histogram for (must be numeric)'
+                },
+                "nbins": {
+                    "type": "integer",
+                    "description": "Number of bins for the histogram, defaults to 50"
+                },
+                "bin_size": {
+                    "type": "number",
+                    "description": "Size of bins for the histogram (overrides nbins if provided)"
+                }
+            },
+            "required": ["df", "column"]
+        }
+    }
+
+    @classmethod
+    def call(cls, objs, df=None, column=None, nbins=50, bin_size=None):
+        if df is None:
+            return "Error: df parameter is required", None
+        if column is None:
+            return "Error: column parameter is required", None
+
+        if df not in objs:
+            return f"Error: DataFrame '{df}' not found", None
+
+        pandas_df = objs[df].data
+        if column not in pandas_df.columns:
+            return f"Error: Column '{column}' not found in DataFrame '{df}'", None
+
+        if not pd.api.types.is_numeric_dtype(pandas_df[column]):
+            return f"Error: Column '{column}' is not numeric", None
+
+        try:
+            if bin_size is not None:
+                fig = go.Figure(data=[go.Histogram(x=pandas_df[column], xbins=dict(size=bin_size))])
+            else:
+                fig = px.histogram(pandas_df, x=column)
+            fig.show()
+            return f"Histogram for column '{column}' in DataFrame '{df}' has been plotted and opened in the browser.", None
+        except Exception as e:
+            return f"Error creating histogram: {str(e)}", None
 
 
 ##taxa = TaxonCount.from_json_list(response['results'][:10])
